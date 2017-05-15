@@ -16,11 +16,16 @@
 
 #define CAPTURE_WIDTH 720
 #define CAPTURE_HEIGHT 576
-#define CAPTURE_PIX_FMT V4L2_PIX_FMT_JPEG
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
 
 #define CAMERA_DEVICE "/dev/video0"
 
-#define CAPTURED_IMAGE_PATH "./capture.jpg"
+#define FRAME_BUFFER_COUNT 5
+struct {
+    void *start;
+    size_t length;
+} FrameBuffer[FRAME_BUFFER_COUNT];
+
 
 int main()
 {
@@ -93,21 +98,93 @@ int main()
     }
 #endif
 
-    // 最简单的Capture Image例子，不使用mmap那种复杂的方法
-    void *buffer = 0;
-    buffer = malloc(CAPTURE_WIDTH*CAPTURE_HEIGHT*4);
 
-    ssize_t size = -1;
-    if ((size = read(cam_fd, buffer, CAPTURE_WIDTH*CAPTURE_HEIGHT*4)) >= 0) {
-        int file_fd = open(CAPTURED_IMAGE_PATH, O_RDWR | O_CREAT);
-        write(file_fd, buffer, size);
-        close(file_fd);
-    }
-    else {
-        fprintf(stderr, "Fail to capture one image from camera!");
+    // request buffer memory
+    struct v4l2_requestbuffers req_buffer;
+    req_buffer.count = FRAME_BUFFER_COUNT;
+    req_buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    req_buffer.memory = V4L2_MEMORY_MMAP;
+
+    if(ioctl(cam_fd, VIDIOC_REQBUFS, &req_buffer) < 0) {
+        fprintf(stderr, "Fail to request frame buffer!\n");
+        return -1;
     }
 
-    if (buffer != 0) free(buffer);
+
+    int i = 0;
+    struct v4l2_buffer buf;
+    for (i = 0; i < req_buffer.count; ++i) {
+
+        buf.index = i;
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buf.memory = V4L2_MEMORY_MMAP;
+        if(ioctl(cam_fd , VIDIOC_QUERYBUF, &buf) < 0) {
+            fprintf(stderr, "Fail to query frame buffer!\n");
+            return -1;
+        }
+
+        // mmap buffer
+        FrameBuffer[i].length = buf.length;
+        FrameBuffer[i].start = (char *) mmap(0, buf.length, PROT_READ|PROT_WRITE, MAP_SHARED, cam_fd, buf.m.offset);
+        if (FrameBuffer[i].start == MAP_FAILED) {
+            fprintf(stderr, "Fail to mmap (%d) : %s !\n", i, strerror(errno));
+            return -1;
+        }
+
+        // queen buffer
+        if (ioctl(cam_fd, VIDIOC_QBUF, &buf) < 0) {
+            fprintf(stderr, "Fail to queen buffer!\n");
+            return -1;
+        }
+
+        printf("Frame buffer %d: address=0x%x, length=%d\n", i, (unsigned int)FrameBuffer[i].start, FrameBuffer[i].length);
+    }
+
+    // start streaming
+    enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (ioctl(cam_fd, VIDIOC_STREAMON, &type) < 0) {
+        printf("VIDIOC_STREAMON failed!\n");
+        return -1;
+    }
+
+    for (i = 0; i < FRAME_BUFFER_COUNT; ++i) {
+        // Get frame
+        if (ioctl(cam_fd, VIDIOC_DQBUF, &buf) < 0) {
+            printf("VIDIOC_DQBUF failed!\n");
+            return -1;
+        }
+
+        char filename[64];
+        sprintf(filename, "%d.jpg", i);
+        FILE *fp = fopen(filename, "wb");
+        if (fp < 0) {
+            printf("open frame data file failed\n");
+            return -1;
+        }
+        fwrite(FrameBuffer[buf.index].start, 1, buf.bytesused, fp);
+        fclose(fp);
+        printf("Capture one frame saved in %s\n", filename);
+
+        // requeue buffer
+        if (ioctl(cam_fd, VIDIOC_QBUF, &buf) < 0) {
+            printf("VIDIOC_QBUF failed!\n");
+            return -1;
+        }
+    }
+
+    // stop streaming
+    if (ioctl(cam_fd, VIDIOC_STREAMOFF, &type) < 0) {
+        printf("VIDIOC_STREAMON failed!\n");
+        return -1;
+    }
+
+    // release the resource
+    for (i = 0; i < FRAME_BUFFER_COUNT; i++)
+    {
+        munmap(FrameBuffer[i].start, FrameBuffer[i].length);
+    }
 
     close(cam_fd);
+
+    return 0;
 }

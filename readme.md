@@ -1,4 +1,4 @@
-Simplistic v4l2 camera test example
+Simplistic v4l2 camera test example, use mmap
 
 Usage:
 	cmake . && make -j4
