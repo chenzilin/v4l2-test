@@ -46,42 +46,18 @@ int main()
 
 #ifdef DEBUG
     // print camera capability information
-    printf("Camera Capability Information:\n");
+    printf("\033[32mCamera Capability Information:\033[0m\n");
     printf("  Driver: %s\n", v4l2_cap.driver);
     printf("  Card: %s\n", v4l2_cap.card);
     printf("  Bus_Info: %s\n", v4l2_cap.bus_info);
     printf("  Kernel Version: 0x%08X\n", v4l2_cap.version);
     printf("  Capabilities: 0x%08X\n", v4l2_cap.capabilities);
     printf("  Device Capabilities: 0x%08X\n", v4l2_cap.device_caps);
+    printf("  Capable of capture: %s\n", v4l2_cap.capabilities & V4L2_CAP_VIDEO_CAPTURE ? "\033[32mYes\033[0m":"\033[33mNo\033[0m");
+    printf("  Capable of streaming: %s\n", v4l2_cap.capabilities & V4L2_CAP_STREAMING ? "\033[32mYes\033[0m":"\033[33mNo\033[0m");
 #endif
 
-    // settings for video format
-    struct v4l2_format v4l2_fmt;
-    memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
-    v4l2_fmt.type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    v4l2_fmt.fmt.pix.width       = CAPTURE_WIDTH;
-    v4l2_fmt.fmt.pix.height      = CAPTURE_HEIGHT;
-    v4l2_fmt.fmt.pix.pixelformat = CAPTURE_PIX_FMT;
-    v4l2_fmt.fmt.pix.field       = V4L2_FIELD_INTERLACED;
-    if (ioctl(cam_fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
-        fprintf(stderr, "Fail to set capture image format!\n");
-        return -1;
-    }
-
 #ifdef DEBUG
-    // print capture image format information
-    printf("Capture Image Format Information:\n");
-    printf("  Type: %d\n", v4l2_fmt.type);
-    printf("  Width: %d\n", v4l2_fmt.fmt.pix.width);
-    printf("  Height: %d\n", v4l2_fmt.fmt.pix.height);
-    printf("  PixelFormat: %d\n", v4l2_fmt.fmt.pix.pixelformat);
-    printf("  Field: %d\n", v4l2_fmt.fmt.pix.field);
-    printf("  BytesPerLine: %d\n", v4l2_fmt.fmt.pix.bytesperline);
-    printf("  SizeImage: %d\n", v4l2_fmt.fmt.pix.sizeimage);
-    printf("  ColorSpace: %d\n", v4l2_fmt.fmt.pix.colorspace);
-    printf("  Priv: %d\n", v4l2_fmt.fmt.pix.priv);
-    printf("  RawDate: %s\n", v4l2_fmt.fmt.raw_data);
-
     // query fps
     struct v4l2_streamparm streamparm;
     memset(&streamparm, 0, sizeof(struct v4l2_streamparm));
@@ -98,6 +74,57 @@ int main()
     }
 #endif
 
+    // query camera can capture image type
+    struct v4l2_fmtdesc ffmt;
+    memset(&ffmt, 0, sizeof(struct v4l2_fmtdesc));
+    ffmt.index = 0;
+    ffmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+    printf("\033[32mCamera can capture PixelFormat:\033[0m\n");
+    while (ioctl(cam_fd, VIDIOC_ENUM_FMT, &ffmt) == 0) {
+        printf("  %d: \033[32m0x%08X, %s\033[0m\n", ffmt.index, ffmt.pixelformat, (char *)ffmt.description);
+        ffmt.index++;
+    }
+
+    // query camera can capture image size by CAPTURE_PIX_FMT
+    struct v4l2_frmsizeenum fsize;
+    memset(&fsize, 0, sizeof(struct v4l2_frmsizeenum));
+    fsize.index = 0;
+    fsize.pixel_format = CAPTURE_PIX_FMT;
+
+    printf("\033[32mCamera can capture FrameSize by PixelFormat: 0x%08X\033[0m\n", CAPTURE_PIX_FMT);
+    while (ioctl(cam_fd, VIDIOC_ENUM_FRAMESIZES, &fsize) == 0) {
+        printf("  %d: \033[32m%dx%d\033[0m\n", fsize.index, fsize.discrete.width, fsize.discrete.height);
+            fsize.index++;
+   }
+
+    // settings for video format
+    struct v4l2_format v4l2_fmt;
+    memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
+    v4l2_fmt.type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2_fmt.fmt.pix.width       = CAPTURE_WIDTH;
+    v4l2_fmt.fmt.pix.height      = CAPTURE_HEIGHT;
+    v4l2_fmt.fmt.pix.pixelformat = CAPTURE_PIX_FMT;
+    v4l2_fmt.fmt.pix.field       = V4L2_FIELD_INTERLACED;
+    if (ioctl(cam_fd, VIDIOC_S_FMT, &v4l2_fmt) < 0) {
+        fprintf(stderr, "Fail to set capture image format!\n");
+        return -1;
+    }
+
+#ifdef DEBUG
+    // print capture image format information
+    printf("\033[32mCapture Image Format Set Information:\033[0m\n");
+    printf("  Type: %d\n", v4l2_fmt.type);
+    printf("  Width: \033[32m%d\033[0m\n", v4l2_fmt.fmt.pix.width);
+    printf("  Height: \033[32m%d\033[0m\n", v4l2_fmt.fmt.pix.height);
+    printf("  PixelFormat: \033[32m0x%08X\033[0m\n", v4l2_fmt.fmt.pix.pixelformat);
+    printf("  Field: %d\n", v4l2_fmt.fmt.pix.field);
+    printf("  BytesPerLine: %d\n", v4l2_fmt.fmt.pix.bytesperline);
+    printf("  SizeImage: %d\n", v4l2_fmt.fmt.pix.sizeimage);
+    printf("  ColorSpace: %d\n", v4l2_fmt.fmt.pix.colorspace);
+    printf("  Priv: %d\n", v4l2_fmt.fmt.pix.priv);
+    printf("  RawDate: %s\n", v4l2_fmt.fmt.raw_data);
+#endif
 
     // request buffer memory
     struct v4l2_requestbuffers req_buffer;
