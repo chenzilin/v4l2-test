@@ -16,9 +16,15 @@
 
 #define CAPTURE_WIDTH 720
 #define CAPTURE_HEIGHT 576
-#define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
 
+#ifdef IMX6
+#define CAMERA_DEVICE "/dev/video1"
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_UYVY
+#elif RPI3
 #define CAMERA_DEVICE "/dev/video0"
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
+#endif
+
 
 #define FRAME_BUFFER_COUNT 5
 struct {
@@ -98,6 +104,51 @@ int main()
             fsize.index++;
    }
 
+#ifdef IMX6
+    v4l2_std_id std_id = 0;
+    if (ioctl(cam_fd, VIDIOC_G_STD, &std_id) < 0) {
+        fprintf(stderr, "VIDIOC_G_STD error!\n");
+        return -1;
+    }
+    switch (std_id) {
+    case V4L2_STD_ALL:
+        fprintf(stderr, "No camera detected!\n");
+        break;
+    case V4L2_STD_NTSC:
+        printf("NTSC camera detected!\n");
+        break;
+    case V4L2_STD_PAL:
+        printf("PAL camera detected!\n");
+        break;
+    default:
+        fprintf(stderr, "Unknown camera!\n");
+        break;
+    }
+
+    struct v4l2_crop crop;
+    struct v4l2_cropcap cropcap;
+    memset(&cropcap, 0, sizeof(cropcap));
+    cropcap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (ioctl(cam_fd, VIDIOC_CROPCAP, &cropcap) < 0) {
+        crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        crop.c = cropcap.defrect; /* reset to default */
+
+        if (ioctl(cam_fd, VIDIOC_S_CROP, &crop) < 0)
+            fprintf(stderr, "VIDIOC_S_CROP error!\n");
+    }
+
+    struct v4l2_streamparm parm;
+    parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    parm.parm.capture.timeperframe.numerator = 1;
+    parm.parm.capture.timeperframe.denominator = 0;
+    parm.parm.capture.capturemode = 0;
+    if (ioctl(cam_fd, VIDIOC_S_PARM, &parm) < 0) {
+        fprintf(stderr, "VIDIOC_S_PARM error!\n");
+        return -1;
+    }
+
+#endif
+
     // settings for video format
     struct v4l2_format v4l2_fmt;
     memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
@@ -137,7 +188,6 @@ int main()
         return -1;
     }
 
-
     int i = 0;
     struct v4l2_buffer buf;
     for (i = 0; i < req_buffer.count; ++i) {
@@ -176,14 +226,19 @@ int main()
 
     for (i = 0; i < FRAME_BUFFER_COUNT; ++i) {
         // Get frame
+        usleep(100*1000); // n*1000 = n ms
         if (ioctl(cam_fd, VIDIOC_DQBUF, &buf) < 0) {
             printf("VIDIOC_DQBUF failed!\n");
             return -1;
         }
 
         char filename[64];
-        sprintf(filename, "%d.jpg", i);
-        FILE *fp = fopen(filename, "wb");
+#ifdef IMX6
+        sprintf(filename, "capture%d.uyvy", i);
+#elif RPI3
+        sprintf(filename, "capture%d.jpg", i);
+#endif
+        FILE *fp = fopen(filename, "w+");
         if (fp < 0) {
             printf("open frame data file failed\n");
             return -1;
