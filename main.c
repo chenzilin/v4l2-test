@@ -105,6 +105,20 @@ int main()
    }
 
 #ifdef IMX6
+    struct v4l2_input input;
+    memset(&input, 0, sizeof(input));
+    input.index = 0;
+    while (ioctl(cam_fd, VIDIOC_ENUMINPUT, &input) == 0) {
+        printf("Input name: %s, type= %d, status=%d, std= %d \n", (char *)input.name, input.type, input.status, input.std);
+        input.index++;
+    }
+
+    int s_in = 1;
+    if (ioctl(cam_fd, VIDIOC_S_INPUT, &s_in) < 0) {
+        fprintf(stderr, "VIDIOC_S_INPUT error!\n");
+        return -1;
+    }
+
     v4l2_std_id std_id = 0;
     if (ioctl(cam_fd, VIDIOC_G_STD, &std_id) < 0) {
         fprintf(stderr, "VIDIOC_G_STD error!\n");
@@ -123,6 +137,11 @@ int main()
     default:
         fprintf(stderr, "Unknown camera!\n");
         break;
+    }
+
+    if (ioctl(cam_fd, VIDIOC_S_STD, &std_id) < 0) {
+        fprintf(stderr, "VIDIOC_S_STD error!\n");
+        return -1;
     }
 
     struct v4l2_crop crop;
@@ -163,6 +182,10 @@ int main()
     }
 
 #ifdef DEBUG
+    if (ioctl(cam_fd, VIDIOC_G_FMT, &v4l2_fmt) < 0) {
+        fprintf(stderr, "Fail to set capture image format!\n");
+        return -1;
+    }
     // print capture image format information
     printf("\033[32mCapture Image Format Set Information:\033[0m\n");
     printf("  Type: %d\n", v4l2_fmt.type);
@@ -202,7 +225,7 @@ int main()
 
         // mmap buffer
         FrameBuffer[i].length = buf.length;
-        FrameBuffer[i].start = (char *) mmap(0, buf.length, PROT_READ|PROT_WRITE, MAP_SHARED, cam_fd, buf.m.offset);
+        FrameBuffer[i].start = (char *) mmap(NULL, buf.length, PROT_READ|PROT_WRITE, MAP_SHARED, cam_fd, buf.m.offset);
         if (FrameBuffer[i].start == MAP_FAILED) {
             fprintf(stderr, "Fail to mmap (%d) : %s !\n", i, strerror(errno));
             return -1;
@@ -226,7 +249,6 @@ int main()
 
     for (i = 0; i < FRAME_BUFFER_COUNT; ++i) {
         // Get frame
-        usleep(100*1000); // n*1000 = n ms
         if (ioctl(cam_fd, VIDIOC_DQBUF, &buf) < 0) {
             printf("VIDIOC_DQBUF failed!\n");
             return -1;
@@ -243,6 +265,7 @@ int main()
             printf("open frame data file failed\n");
             return -1;
         }
+
         fwrite(FrameBuffer[buf.index].start, 1, buf.bytesused, fp);
         fclose(fp);
         printf("Capture one frame saved in %s\n", filename);
