@@ -14,13 +14,20 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
+
+#ifdef PC
+#define CAPTURE_WIDTH 640
+#define CAPTURE_HEIGHT 480
+#define CAMERA_DEVICE "/dev/video0"
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
+#elif IMX6
 #define CAPTURE_WIDTH 720
 #define CAPTURE_HEIGHT 576
-
-#ifdef IMX6
 #define CAMERA_DEVICE "/dev/video1"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_UYVY
 #elif RPI3
+#define CAPTURE_WIDTH 720
+#define CAPTURE_HEIGHT 576
 #define CAMERA_DEVICE "/dev/video0"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
 #endif
@@ -249,13 +256,16 @@ int main()
 
     for (i = 0; i < FRAME_BUFFER_COUNT; ++i) {
         // Get frame
+        usleep(100*1000); // n*1000 = n ms
         if (ioctl(cam_fd, VIDIOC_DQBUF, &buf) < 0) {
             printf("VIDIOC_DQBUF failed!\n");
             return -1;
         }
 
         char filename[64];
-#ifdef IMX6
+#ifdef PC
+        sprintf(filename, "capture%d.jpg", i);
+#elif IMX6
         sprintf(filename, "capture%d.uyvy", i);
 #elif RPI3
         sprintf(filename, "capture%d.jpg", i);
