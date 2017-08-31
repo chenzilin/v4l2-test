@@ -16,20 +16,39 @@
 
 
 #ifdef PC
+
 #define CAPTURE_WIDTH 640
 #define CAPTURE_HEIGHT 480
 #define CAMERA_DEVICE "/dev/video0"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
+
+#elif A20
+
+#define VIN_ROW_NUM     1
+#define VIN_COL_NUM     1
+#define VIN_SYSTEM_NTSC 0
+#define VIN_SYSTEM_PAL  1
+#define VIN_SYSTEM      VIN_SYSTEM_PAL
+
+#define CAPTURE_WIDTH 720
+#define CAPTURE_HEIGHT 576
+#define CAMERA_DEVICE "/dev/video1"
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_NV12
+
 #elif IMX6
+
 #define CAPTURE_WIDTH 720
 #define CAPTURE_HEIGHT 576
 #define CAMERA_DEVICE "/dev/video1"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_UYVY
+
 #elif RPI3
+
 #define CAPTURE_WIDTH 720
 #define CAPTURE_HEIGHT 576
 #define CAMERA_DEVICE "/dev/video0"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
+
 #endif
 
 
@@ -71,6 +90,8 @@ int main()
 #endif
 
 #ifdef DEBUG
+
+#ifndef A20
     // query fps
     struct v4l2_streamparm streamparm;
     memset(&streamparm, 0, sizeof(struct v4l2_streamparm));
@@ -87,6 +108,9 @@ int main()
     }
 #endif
 
+#endif
+
+#ifndef A20
     // query camera can capture image type
     struct v4l2_fmtdesc ffmt;
     memset(&ffmt, 0, sizeof(struct v4l2_fmtdesc));
@@ -98,6 +122,7 @@ int main()
         printf("  %d: \033[32m0x%08X, %s\033[0m\n", ffmt.index, ffmt.pixelformat, (char *)ffmt.description);
         ffmt.index++;
     }
+#endif
 
     // query camera can capture image size by CAPTURE_PIX_FMT
     struct v4l2_frmsizeenum fsize;
@@ -175,6 +200,7 @@ int main()
 
 #endif
 
+#ifndef A20
     // settings for video format
     struct v4l2_format v4l2_fmt;
     memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
@@ -205,6 +231,59 @@ int main()
     printf("  ColorSpace: %d\n", v4l2_fmt.fmt.pix.colorspace);
     printf("  Priv: %d\n", v4l2_fmt.fmt.pix.priv);
     printf("  RawDate: %s\n", v4l2_fmt.fmt.raw_data);
+#endif
+
+#else
+
+    // set position and auto calculate size
+    struct v4l2_format fmt;
+    memset(&fmt, 0, sizeof(fmt));
+    fmt.type = V4L2_BUF_TYPE_PRIVATE;
+    fmt.fmt.raw_data[0] =0;           // interface
+    fmt.fmt.raw_data[1] =VIN_SYSTEM;  // system, 1=pal, 0=ntsc
+    fmt.fmt.raw_data[8] =VIN_ROW_NUM; // row
+    fmt.fmt.raw_data[9] =VIN_COL_NUM; // column
+    fmt.fmt.raw_data[10] =1;          // channel_index
+    fmt.fmt.raw_data[11] =0;          // channel_index
+    fmt.fmt.raw_data[12] =0;          // channel_index
+    fmt.fmt.raw_data[13] =0;          // channel_index
+    if (-1 == ioctl (cam_fd, VIDIOC_S_FMT, &fmt)) {
+        printf("VIDIOC_S_FMT error!\n");
+        return -1;
+    }
+
+    memset(&fmt, 0, sizeof(fmt));
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (ioctl(cam_fd, VIDIOC_G_FMT, &fmt) < 0) {
+        printf("VIDIOC_G_FMT error\n");
+        return -1;
+    }
+
+    // pvdev->offset[0] = w * h;
+    switch(fmt.fmt.pix.pixelformat) {
+    case V4L2_PIX_FMT_YUV422P:
+    case V4L2_PIX_FMT_YUYV:
+    case V4L2_PIX_FMT_YVYU:
+    case V4L2_PIX_FMT_UYVY:
+    case V4L2_PIX_FMT_VYUY:
+        // pvdev->offset[1] = w*h*3/2;
+        break;
+    case V4L2_PIX_FMT_YUV420:
+        // pvdev->offset[1] = w*h*5/4;
+        break;
+    case V4L2_PIX_FMT_NV16:
+    case V4L2_PIX_FMT_NV12:
+    case V4L2_PIX_FMT_HM12:
+        // pvdev->offset[1] = pvdev->offset[0];
+        break;
+    default:
+        printf("csi_format is not found!\n");
+        break;
+    }
+
+    // printf("cap size %d x %d offset: %x, %x\n", 
+    // fmt.fmt.pix.width, fmt.fmt.pix.height, pvdev->offset[0], pvdev->offset[1]);
+
 #endif
 
     // request buffer memory
@@ -265,6 +344,8 @@ int main()
         char filename[64];
 #ifdef PC
         sprintf(filename, "capture%d.jpg", i);
+#elif A20
+        sprintf(filename, "capture%d.yuv", i);
 #elif IMX6
         sprintf(filename, "capture%d.uyvy", i);
 #elif RPI3
