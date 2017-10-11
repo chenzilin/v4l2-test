@@ -10,7 +10,7 @@ set (SRC_VERSION ${SRC_VERSION_MAJOR}.${SRC_VERSION_MINOR}.${SRC_VERSION_PATCH})
 set (PROJECT_VERSION "${SRC_VERSION}")
 
 add_definitions(-DPC)
-    add_definitions(-DPC_UVC_JINGUI)
+    add_definitions(-DPC_UVC_JINGUI_S9)
 #add_definitions(-DA20)
 #add_definitions(-DRPI3)
 #add_definitions(-DIMX6)

@@ -21,7 +21,7 @@
 #define CAPTURE_HEIGHT 480
 #define CAMERA_DEVICE "/dev/video0"
 
-#ifdef PC_UVC_JINGUI
+#ifdef PC_UVC_JINGUI_S9
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_YUYV
 #else
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
@@ -348,7 +348,7 @@ int main()
 
         char filename[64];
 #ifdef PC
-#ifdef PC_UVC_JINGUI
+#ifdef PC_UVC_JINGUI_S9
         sprintf(filename, "capture%d.yuyv", i);
 #else
         sprintf(filename, "capture%d.jpg", i);
