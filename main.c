@@ -20,7 +20,12 @@
 #define CAPTURE_WIDTH 640
 #define CAPTURE_HEIGHT 480
 #define CAMERA_DEVICE "/dev/video0"
+
+#ifdef PC_UVC_JINGUI
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_YUYV
+#else
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
+#endif
 
 #elif A20
 
@@ -343,7 +348,11 @@ int main()
 
         char filename[64];
 #ifdef PC
+#ifdef PC_UVC_JINGUI
+        sprintf(filename, "capture%d.yuyv", i);
+#else
         sprintf(filename, "capture%d.jpg", i);
+#endif
 #elif A20
         sprintf(filename, "capture%d.yuv", i);
 #elif IMX6
