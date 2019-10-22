@@ -40,6 +40,19 @@
 #define CAMERA_DEVICE "/dev/video1"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_NV12
 
+#elif T3
+
+#define VIN_ROW_NUM     1
+#define VIN_COL_NUM     1
+#define VIN_SYSTEM_NTSC 0
+#define VIN_SYSTEM_PAL  1
+#define VIN_SYSTEM      VIN_SYSTEM_PAL
+
+#define CAPTURE_WIDTH 720
+#define CAPTURE_HEIGHT 576
+#define CAMERA_DEVICE "/dev/video4"
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_NV12
+
 #elif IMX6
 
 #define CAPTURE_WIDTH 720
@@ -57,7 +70,7 @@
 #endif
 
 
-#define FRAME_BUFFER_COUNT 5
+#define FRAME_BUFFER_COUNT 6
 struct {
     void *start;
     size_t length;
@@ -205,7 +218,7 @@ int main()
 
 #endif
 
-#ifndef A20
+#ifndef A20 && !defined(T3)
     // settings for video format
     struct v4l2_format v4l2_fmt;
     memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
@@ -243,7 +256,7 @@ int main()
     // set position and auto calculate size
     struct v4l2_format fmt;
     memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_PRIVATE;
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     fmt.fmt.raw_data[0] =0;           // interface
     fmt.fmt.raw_data[1] =VIN_SYSTEM;  // system, 1=pal, 0=ntsc
     fmt.fmt.raw_data[8] =VIN_ROW_NUM; // row
@@ -257,26 +270,26 @@ int main()
         return -1;
     }
 
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (ioctl(cam_fd, VIDIOC_G_FMT, &fmt) < 0) {
-        printf("VIDIOC_G_FMT error\n");
-        return -1;
-    }
 
     // pvdev->offset[0] = w * h;
     switch(fmt.fmt.pix.pixelformat) {
     case V4L2_PIX_FMT_YUV422P:
     case V4L2_PIX_FMT_YUYV:
+#ifndef T3
     case V4L2_PIX_FMT_YVYU:
+#endif
     case V4L2_PIX_FMT_UYVY:
+#ifndef T3
     case V4L2_PIX_FMT_VYUY:
+#endif
         // pvdev->offset[1] = w*h*3/2;
         break;
     case V4L2_PIX_FMT_YUV420:
         // pvdev->offset[1] = w*h*5/4;
         break;
+#ifndef T3
     case V4L2_PIX_FMT_NV16:
+#endif
     case V4L2_PIX_FMT_NV12:
     case V4L2_PIX_FMT_HM12:
         // pvdev->offset[1] = pvdev->offset[0];
@@ -353,6 +366,8 @@ int main()
 #else
         sprintf(filename, "capture%d.jpg", i);
 #endif
+#elif T3
+        sprintf(filename, "capture%d.yuv", i);
 #elif A20
         sprintf(filename, "capture%d.yuv", i);
 #elif IMX6
