@@ -27,6 +27,25 @@
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_MJPEG
 #endif
 
+#elif T3
+
+#define VIN_ROW_NUM     1
+#define VIN_COL_NUM     1
+#define VIN_SYSTEM_NTSC 0
+#define VIN_SYSTEM_PAL  1
+#define VIN_SYSTEM      VIN_SYSTEM_PAL
+
+/*  Flags for 'capability' and 'capturemode' fields */
+#define V4L2_MODE_HIGHQUALITY 0x0001
+#define V4L2_MODE_VIDEO       0x0002
+#define V4L2_MODE_IMAGE       0x0003
+#define V4L2_MODE_PREVIEW     0x0004
+
+#define CAPTURE_WIDTH 720
+#define CAPTURE_HEIGHT 576
+#define CAMERA_DEVICE "/dev/video4"
+#define CAPTURE_PIX_FMT V4L2_PIX_FMT_NV21
+
 #elif A20
 
 #define VIN_ROW_NUM     1
@@ -57,7 +76,7 @@
 #endif
 
 
-#define FRAME_BUFFER_COUNT 5
+#define FRAME_BUFFER_COUNT 6
 struct {
     void *start;
     size_t length;
@@ -205,7 +224,19 @@ int main()
 
 #endif
 
-#ifndef A20
+#ifdef T3
+    struct v4l2_streamparm parm;
+    parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    parm.parm.capture.timeperframe.numerator = 1;
+    parm.parm.capture.timeperframe.denominator = 30;
+    parm.parm.capture.capturemode = V4L2_MODE_VIDEO;
+    if (ioctl(cam_fd, VIDIOC_S_PARM, &parm) < 0) {
+        fprintf(stderr, "VIDIOC_S_PARM error!\n");
+        return -1;
+    }
+#endif
+
+#ifndef A20 && defined(T3)
     // settings for video format
     struct v4l2_format v4l2_fmt;
     memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
@@ -242,6 +273,8 @@ int main()
 
     // set position and auto calculate size
     struct v4l2_format fmt;
+
+#ifndef T3
     memset(&fmt, 0, sizeof(fmt));
     fmt.type = V4L2_BUF_TYPE_PRIVATE;
     fmt.fmt.raw_data[0] =0;           // interface
@@ -256,6 +289,7 @@ int main()
         printf("VIDIOC_S_FMT error!\n");
         return -1;
     }
+#endif
 
     memset(&fmt, 0, sizeof(fmt));
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -268,15 +302,21 @@ int main()
     switch(fmt.fmt.pix.pixelformat) {
     case V4L2_PIX_FMT_YUV422P:
     case V4L2_PIX_FMT_YUYV:
+#ifndef T3
     case V4L2_PIX_FMT_YVYU:
+#endif
     case V4L2_PIX_FMT_UYVY:
+#ifndef T3
     case V4L2_PIX_FMT_VYUY:
+#endif
         // pvdev->offset[1] = w*h*3/2;
         break;
     case V4L2_PIX_FMT_YUV420:
         // pvdev->offset[1] = w*h*5/4;
         break;
+#ifndef T3
     case V4L2_PIX_FMT_NV16:
+#endif
     case V4L2_PIX_FMT_NV12:
     case V4L2_PIX_FMT_HM12:
         // pvdev->offset[1] = pvdev->offset[0];
@@ -353,6 +393,8 @@ int main()
 #else
         sprintf(filename, "capture%d.jpg", i);
 #endif
+#elif T3
+        sprintf(filename, "capture%d.yuv", i);
 #elif A20
         sprintf(filename, "capture%d.yuv", i);
 #elif IMX6
