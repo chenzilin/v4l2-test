@@ -256,7 +256,11 @@ int main()
     // set position and auto calculate size
     struct v4l2_format fmt;
     memset(&fmt, 0, sizeof(fmt));
+#ifdef A20
+    fmt.type = V4L2_BUF_TYPE_PRIVATE;
+#else
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+#endif
     fmt.fmt.raw_data[0] =0;           // interface
     fmt.fmt.raw_data[1] =VIN_SYSTEM;  // system, 1=pal, 0=ntsc
     fmt.fmt.raw_data[8] =VIN_ROW_NUM; // row
