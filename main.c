@@ -35,8 +35,6 @@
 #define VIN_SYSTEM_PAL  1
 #define VIN_SYSTEM      VIN_SYSTEM_PAL
 
-#define CAPTURE_WIDTH 720
-#define CAPTURE_HEIGHT 576
 #define CAMERA_DEVICE "/dev/video1"
 #define CAPTURE_PIX_FMT V4L2_PIX_FMT_NV12
 
@@ -261,19 +259,26 @@ int main()
 #else
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 #endif
-    fmt.fmt.raw_data[0] =0;           // interface
-    fmt.fmt.raw_data[1] =VIN_SYSTEM;  // system, 1=pal, 0=ntsc
-    fmt.fmt.raw_data[8] =VIN_ROW_NUM; // row
-    fmt.fmt.raw_data[9] =VIN_COL_NUM; // column
-    fmt.fmt.raw_data[10] =1;          // channel_index
-    fmt.fmt.raw_data[11] =0;          // channel_index
-    fmt.fmt.raw_data[12] =0;          // channel_index
-    fmt.fmt.raw_data[13] =0;          // channel_index
+    fmt.fmt.raw_data[0] = 0;           // interface
+    fmt.fmt.raw_data[1] = VIN_SYSTEM;  // system, 1=pal, 0=ntsc
+    fmt.fmt.raw_data[8] = VIN_ROW_NUM; // row
+    fmt.fmt.raw_data[9] = VIN_COL_NUM; // column
+    fmt.fmt.raw_data[10] = 1;          // channel_index
+    fmt.fmt.raw_data[11] = 0;          // channel_index
+    fmt.fmt.raw_data[12] = 0;          // channel_index
+    fmt.fmt.raw_data[13] = 0;          // channel_index
     if (-1 == ioctl (cam_fd, VIDIOC_S_FMT, &fmt)) {
         printf("VIDIOC_S_FMT error!\n");
         return -1;
     }
 
+    memset(&fmt, 0, sizeof(fmt));
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (-1 == ioctl(cam_fd, VIDIOC_G_FMT, &fmt)) {
+        printf("VIDIOC_G_FMT error\n");
+        return -1;
+    }
+    printf("Capture Size WidthxHeight: %dx%d\n", fmt.fmt.pix.width, fmt.fmt.pix.height);
 
     // pvdev->offset[0] = w * h;
     switch(fmt.fmt.pix.pixelformat) {

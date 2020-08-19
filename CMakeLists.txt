@@ -11,10 +11,10 @@ set (PROJECT_VERSION "${SRC_VERSION}")
 
 #add_definitions(-DUVC)
 #    add_definitions(-DUVC_JINGUI_S9)
-#add_definitions(-DA20)
+add_definitions(-DA20)
 #add_definitions(-DRPI3)
 #add_definitions(-DIMX6)
-add_definitions(-DT3)
+#add_definitions(-DT3)
 add_definitions(-DDEBUG)
 
 install(TARGETS v4l2-test DESTINATION bin)
