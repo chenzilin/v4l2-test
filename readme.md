@@ -14,6 +14,8 @@ Usage:
 Sunxi A20/T3 Format:
 	ffmpeg -s 720x576 -pix_fmt nv12 -i capture0.yuv -f image2 -pix_fmt rgb24 captdump.png
 
+	for program_guide.txt and tvd-test under linux/drivers/media/video/sunxi_tvd
+
 Raw image viewer:
 	RawViewer.exe
 
